@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Google Sheets</title>
+    
+    <!-- Script untuk mendeteksi perubahan harian dan memaksa reload dari server -->
+    <script>
+        // Mengatur auto-refresh setiap 5000 milidetik (5 detik)
+        setInterval(function() {
+            window.location.reload(true); // Memaksa browser mengambil data terbaru dari server
+        }, 5000);
+    </script>
+
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Menampilkan tautan Google Sheets Anda menggunakan iframe -->
+    <iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vQrR_4sYU9WDCp382UliBFElOjQ_lvMkvZQl9tkzRmrNmdYT3ZDSRPoXV3Qm8d12eZ46prmGhVFuym4/pubhtml?gid=1962305559&single=true"></iframe>
+
+</body>
+</html>
