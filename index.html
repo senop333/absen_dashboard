@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Google Sheets - No Blink</title>
+    <title>Dashboard Google Sheets - Zero Blink</title>
     
     <style>
         body, html {
@@ -11,224 +11,333 @@
             padding: 0;
             height: 100%;
             overflow: hidden;
+            background: #ffffff;
             font-family: Arial, sans-serif;
-            background-color: #ffffff;
         }
         
-        /* Container untuk iframe */
-        #iframe-container {
+        #container {
             position: relative;
-            width: 100%;
-            height: 100%;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
         }
         
-        iframe {
+        .dashboard-frame {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
             border: none;
-            transition: opacity 0.15s ease;
+            transition: opacity 0.3s ease;
+            background: #ffffff;
         }
         
-        /* Iframe aktif - terlihat */
-        .active {
+        .frame-visible {
             z-index: 2;
             opacity: 1;
             pointer-events: auto;
         }
         
-        /* Iframe tidak aktif - tersembunyi tapi tetap memuat */
-        .hidden {
+        .frame-hidden {
             z-index: 1;
             opacity: 0;
             pointer-events: none;
         }
         
-        /* Iframe yang sedang memuat - tetap transparan sampai selesai */
-        .loading {
-            z-index: 1;
-            opacity: 0;
-            pointer-events: none;
+        .frame-ready {
+            z-index: 2;
+            opacity: 1;
+            pointer-events: auto;
         }
         
-        /* Loading indicator (opsional) */
-        #loading-indicator {
+        /* Loading overlay untuk menutupi kedipan */
+        #loading-overlay {
             position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 10;
-            display: none;
-            background: rgba(255,255,255,0.9);
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1000;
+            background: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.5s ease;
+        }
+        
+        #loading-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
         }
         
         .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #3498db;
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
             animation: spin 1s linear infinite;
-            margin: 0 auto;
         }
         
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        .loading-text {
+            margin-top: 20px;
+            color: #666;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
 
-    <div id="iframe-container">
-        <!-- Dua iframe untuk teknik swap -->
-        <iframe id="frame1" class="active" src="about:blank"></iframe>
-        <iframe id="frame2" class="hidden" src="about:blank"></iframe>
+    <!-- Loading overlay -->
+    <div id="loading-overlay">
+        <div style="text-align: center;">
+            <div class="spinner"></div>
+            <div class="loading-text">Memuat Dashboard...</div>
+        </div>
     </div>
-    
-    <div id="loading-indicator">
-        <div class="spinner"></div>
-        <p style="margin-top: 10px; text-align: center;">Memuat data...</p>
+
+    <div id="container">
+        <!-- 3 iframe untuk rotasi -->
+        <iframe id="frame1" class="dashboard-frame frame-visible" src="about:blank"></iframe>
+        <iframe id="frame2" class="dashboard-frame frame-hidden" src="about:blank"></iframe>
+        <iframe id="frame3" class="dashboard-frame frame-hidden" src="about:blank"></iframe>
     </div>
 
     <script>
         const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQrR_4sYU9WDCp382UliBFElOjQ_lvMkvZQl9tkzRmrNmdYT3ZDSRPoXV3Qm8d12eZ46prmGhVFuym4/pubhtml?gid=1962305559&single=true";
         
-        let currentFrame = document.getElementById('frame1');
-        let nextFrame = document.getElementById('frame2');
-        let isLoading = false;
-        let loadTimeout = null;
+        // Array untuk menyimpan semua frame
+        const frames = [
+            document.getElementById('frame1'),
+            document.getElementById('frame2'),
+            document.getElementById('frame3')
+        ];
         
-        // Fungsi untuk memuat iframe
-        function loadNextFrame() {
-            if (isLoading) return; // Cegah load ganda
-            
-            isLoading = true;
-            
-            // Tampilkan loading indicator jika perlu (opsional)
-            // document.getElementById('loading-indicator').style.display = 'block';
-            
-            // Set iframe next ke mode loading
-            nextFrame.className = 'loading';
-            
-            // Generate URL dengan timestamp untuk mencegah cache
-            const url = sheetUrl + "&t=" + new Date().getTime();
-            
-            // Set src untuk memulai loading
-            nextFrame.src = url;
-            
-            // Timeout untuk keamanan - jika loading terlalu lama
-            loadTimeout = setTimeout(function() {
-                console.log("Loading timeout, switching anyway");
-                performSwap();
-            }, 10000); // 10 detik timeout
-        }
+        let currentIndex = 0; // Index frame yang sedang aktif
+        let nextIndex = 1;    // Index frame yang akan di-load berikutnya
+        let isUpdating = false;
+        let refreshInterval = null;
+        let isFirstLoad = true;
         
-        // Fungsi untuk melakukan swap
-        function performSwap() {
-            // Hapus timeout jika ada
-            if (loadTimeout) {
-                clearTimeout(loadTimeout);
-                loadTimeout = null;
-            }
-            
-            // Swap class: frame baru menjadi active, frame lama menjadi hidden
-            nextFrame.className = 'active';
-            currentFrame.className = 'hidden';
-            
-            // Tukar referensi
-            let temp = currentFrame;
-            currentFrame = nextFrame;
-            nextFrame = temp;
-            
-            isLoading = false;
-            
-            // Sembunyikan loading indicator
-            // document.getElementById('loading-indicator').style.display = 'none';
-        }
-        
-        // Event handler untuk ketika iframe selesai loading
-        function onFrameLoad() {
-            // Pastikan ini adalah frame yang sedang loading
-            if (this === nextFrame && isLoading) {
-                performSwap();
-            }
-        }
-        
-        // Event handler untuk error
-        function onFrameError() {
-            console.error("Frame loading error");
-            if (this === nextFrame && isLoading) {
-                // Jika error, tetap swap untuk menghindari stuck
-                performSwap();
-            }
-        }
-        
-        // Registrasi event listener untuk kedua iframe
-        document.getElementById('frame1').addEventListener('load', onFrameLoad);
-        document.getElementById('frame1').addEventListener('error', onFrameError);
-        document.getElementById('frame2').addEventListener('load', onFrameLoad);
-        document.getElementById('frame2').addEventListener('error', onFrameError);
-        
-        // Muat frame pertama
-        function initializeFirstFrame() {
-            const url = sheetUrl + "&t=" + new Date().getTime();
-            currentFrame.src = url;
-            
-            // Jika frame pertama selesai loading, mulai interval
-            currentFrame.addEventListener('load', function onFirstLoad() {
-                this.removeEventListener('load', onFirstLoad);
-                startInterval();
+        // Fungsi untuk menandai frame aktif
+        function setActiveFrame(index) {
+            frames.forEach((frame, i) => {
+                if (i === index) {
+                    frame.className = 'dashboard-frame frame-visible';
+                } else {
+                    frame.className = 'dashboard-frame frame-hidden';
+                }
             });
         }
         
-        // Mulai interval refresh
-        function startInterval() {
-            // Refresh setiap 5 detik==================================================================================================================
-            setInterval(function() {
-                loadNextFrame();
-            }, 10000);
+        // Fungsi untuk memuat frame berikutnya
+        function loadNextFrame() {
+            if (isUpdating) {
+                console.log("Update in progress, skipping...");
+                return;
+            }
             
-            console.log("Dashboard started - refresh every 5 seconds");
+            isUpdating = true;
+            
+            // Tentukan frame mana yang akan di-load
+            const targetIndex = (currentIndex + 1) % frames.length;
+            const targetFrame = frames[targetIndex];
+            
+            // Siapkan URL dengan timestamp
+            const url = sheetUrl + "&t=" + new Date().getTime();
+            
+            console.log(`Loading frame ${targetIndex} with URL:`, url);
+            
+            // Set src untuk mulai loading
+            targetFrame.src = url;
+            
+            // Event handler untuk load selesai
+            const loadHandler = function() {
+                targetFrame.removeEventListener('load', loadHandler);
+                targetFrame.removeEventListener('error', errorHandler);
+                
+                // Swap: jadikan frame ini aktif
+                currentIndex = targetIndex;
+                setActiveFrame(currentIndex);
+                
+                // Hapus iframe yang paling lama (3 frame sebelumnya)
+                // Biarkan 2 frame terakhir tetap ada
+                const oldestIndex = (currentIndex + 2) % frames.length;
+                frames[oldestIndex].src = 'about:blank';
+                frames[oldestIndex].className = 'dashboard-frame frame-hidden';
+                
+                isUpdating = false;
+                
+                // Sembunyikan loading overlay setelah first load
+                if (isFirstLoad) {
+                    isFirstLoad = false;
+                    setTimeout(() => {
+                        document.getElementById('loading-overlay').classList.add('hidden');
+                    }, 300);
+                }
+                
+                console.log(`Frame ${targetIndex} loaded successfully`);
+            };
+            
+            // Error handler
+            const errorHandler = function() {
+                targetFrame.removeEventListener('load', loadHandler);
+                targetFrame.removeEventListener('error', errorHandler);
+                
+                console.error(`Frame ${targetIndex} failed to load`);
+                
+                // Coba lagi dengan frame lain
+                isUpdating = false;
+                
+                // Jika masih first load, coba lagi
+                if (isFirstLoad) {
+                    setTimeout(() => {
+                        loadNextFrame();
+                    }, 2000);
+                } else {
+                    // Untuk refresh, gunakan frame lain
+                    setTimeout(() => {
+                        const retryIndex = (targetIndex + 1) % frames.length;
+                        if (retryIndex !== currentIndex) {
+                            const retryFrame = frames[retryIndex];
+                            retryFrame.src = sheetUrl + "&t=" + new Date().getTime();
+                        }
+                    }, 3000);
+                }
+            };
+            
+            targetFrame.addEventListener('load', loadHandler);
+            targetFrame.addEventListener('error', errorHandler);
+            
+            // Timeout safety - jika loading terlalu lama
+            setTimeout(() => {
+                if (isUpdating && targetFrame.src !== 'about:blank') {
+                    console.warn(`Frame ${targetIndex} loading timeout, forcing swap`);
+                    targetFrame.removeEventListener('load', loadHandler);
+                    targetFrame.removeEventListener('error', errorHandler);
+                    
+                    // Force swap
+                    currentIndex = targetIndex;
+                    setActiveFrame(currentIndex);
+                    
+                    // Hapus frame lama
+                    const oldestIndex = (currentIndex + 2) % frames.length;
+                    frames[oldestIndex].src = 'about:blank';
+                    frames[oldestIndex].className = 'dashboard-frame frame-hidden';
+                    
+                    isUpdating = false;
+                    
+                    if (isFirstLoad) {
+                        isFirstLoad = false;
+                        document.getElementById('loading-overlay').classList.add('hidden');
+                    }
+                }
+            }, 15000); // 15 detik timeout
         }
         
-        // Mulai aplikasi
-        initializeFirstFrame();
-        
-        // Fallback jika frame pertama gagal loading
-        setTimeout(function() {
-            if (currentFrame.src === 'about:blank' || currentFrame.src === '') {
-                console.log("First frame not loaded, retrying...");
-                const url = sheetUrl + "&t=" + new Date().getTime();
-                currentFrame.src = url;
+        // Fungsi untuk memulai refresh interval
+        function startRefreshInterval() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
             }
-        }, 3000);
+            
+            // Refresh setiap 15 detik (lebih lama untuk Google Sheets)
+            refreshInterval = setInterval(function() {
+                if (!document.hidden) { // Hanya refresh jika tab terlihat
+                    loadNextFrame();
+                }
+            }, 15000); // 15 detik
+            
+            console.log("Refresh interval started: 15 seconds");
+        }
         
-        // Deteksi visibility change untuk menghemat resource
+        // Inisialisasi - load frame pertama
+        function initialize() {
+            console.log("Initializing dashboard...");
+            
+            // Load frame pertama
+            const firstFrame = frames[0];
+            const url = sheetUrl + "&t=" + new Date().getTime();
+            firstFrame.src = url;
+            
+            // Tunggu frame pertama selesai
+            firstFrame.addEventListener('load', function onFirstLoad() {
+                firstFrame.removeEventListener('load', onFirstLoad);
+                console.log("First frame loaded");
+                
+                // Set sebagai aktif
+                setActiveFrame(0);
+                
+                // Sembunyikan loading overlay
+                isFirstLoad = false;
+                setTimeout(() => {
+                    document.getElementById('loading-overlay').classList.add('hidden');
+                }, 300);
+                
+                // Preload frame kedua
+                setTimeout(() => {
+                    frames[1].src = sheetUrl + "&t=" + new Date().getTime();
+                }, 1000);
+                
+                // Mulai interval refresh
+                startRefreshInterval();
+            });
+            
+            // Error handling untuk first load
+            firstFrame.addEventListener('error', function() {
+                console.error("First frame failed to load, retrying...");
+                setTimeout(() => {
+                    firstFrame.src = sheetUrl + "&t=" + new Date().getTime();
+                }, 3000);
+            });
+            
+            // Timeout untuk first load
+            setTimeout(() => {
+                if (isFirstLoad) {
+                    console.warn("First load timeout, trying again...");
+                    firstFrame.src = sheetUrl + "&t=" + new Date().getTime();
+                }
+            }, 20000);
+        }
+        
+        // Handle visibility change
         document.addEventListener('visibilitychange', function() {
             if (document.hidden) {
-                // Tab tidak terlihat - bisa mengurangi refresh rate jika perlu
-                console.log("Tab hidden - reducing activity");
+                console.log("Tab hidden - pausing refresh");
+                if (refreshInterval) {
+                    clearInterval(refreshInterval);
+                    refreshInterval = null;
+                }
             } else {
-                // Tab terlihat kembali - refresh jika perlu
-                console.log("Tab visible - resuming");
-                // Refresh jika frame terakhir sudah lama
-                if (currentFrame.src && currentFrame.src.includes('&t=')) {
-                    const timestamp = parseInt(currentFrame.src.split('&t=')[1]);
+                console.log("Tab visible - resuming refresh");
+                if (!refreshInterval) {
+                    startRefreshInterval();
+                    // Refresh segera jika sudah lama
                     const now = Date.now();
-                    if (now - timestamp > 10000) { // Lebih dari 10 detik
+                    let shouldRefresh = true;
+                    if (frames[currentIndex].src && frames[currentIndex].src.includes('&t=')) {
+                        const timestamp = parseInt(frames[currentIndex].src.split('&t=')[1]);
+                        if (now - timestamp < 20000) {
+                            shouldRefresh = false;
+                        }
+                    }
+                    if (shouldRefresh && !isUpdating) {
                         loadNextFrame();
                     }
                 }
             }
         });
         
-        console.log("Anti-blink dashboard initialized");
+        // Mulai aplikasi
+        initialize();
+        
+        console.log("Dashboard initialized with triple-frame anti-blink technique");
     </script>
 
 </body>
