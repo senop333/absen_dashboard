@@ -3,16 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Google Sheets</title>
+    <title>Dashboard Google Sheets - Anti Blink</title>
     
-    <!-- Script untuk mendeteksi perubahan harian dan memaksa reload dari server -->
-    <script>
-        // Mengatur auto-refresh setiap 5000 milidetik (5 detik)
-        setInterval(function() {
-            window.location.reload(true); // Memaksa browser mengambil data terbaru dari server
-        }, 5000);
-    </script>
-
     <style>
         body, html {
             margin: 0;
@@ -20,18 +12,58 @@
             height: 100%;
             overflow: hidden;
             font-family: Arial, sans-serif;
+            background-color: #ffffff;
         }
+        /* Iframe dibuat menumpuk di posisi yang sama */
         iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
             border: none;
+            transition: opacity 0.3s ease; /* Transisi halus saat perpindahan */
+        }
+        /* Mengatur iframe mana yang terlihat aktif */
+        .active {
+            z-index: 2;
+            opacity: 1;
+        }
+        .hidden {
+            z-index: 1;
+            opacity: 0;
         }
     </style>
 </head>
 <body>
 
-    <!-- Menampilkan tautan Google Sheets Anda menggunakan iframe -->
-    <iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vQrR_4sYU9WDCp382UliBFElOjQ_lvMkvZQl9tkzRmrNmdYT3ZDSRPoXV3Qm8d12eZ46prmGhVFuym4/pubhtml?gid=1962305559&single=true"></iframe>
+    <!-- Menggunakan dua iframe untuk teknik pertukaran data di latar belakang -->
+    <iframe id="frame1" class="active" src="https://google.com"></iframe>
+    <iframe id="frame2" class="hidden"></iframe>
+
+    <script>
+        const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQrR_4sYU9WDCp382UliBFElOjQ_lvMkvZQl9tkzRmrNmdYT3ZDSRPoXV3Qm8d12eZ46prmGhVFuym4/pubhtml?gid=1962305559&single=true";
+        
+        let currentFrame = document.getElementById('frame1');
+        let nextFrame = document.getElementById('frame2');
+
+        setInterval(function() {
+            // 1. Berikan parameter waktu unik (?t=...) pada URL untuk mencegah browser mengambil cache lama
+            nextFrame.src = sheetUrl + "&t=" + new Date().getTime();
+            
+            // 2. Tunggu sampai iframe di latar belakang selesai memuat data sepenuhnya
+            nextFrame.onload = function() {
+                // Swap kelas CSS agar iframe baru langsung maju ke depan layar
+                nextFrame.className = "active";
+                currentFrame.className = "hidden";
+                
+                // Tukar penunjuk variabel untuk giliran berikutnya
+                let temp = currentFrame;
+                currentFrame = nextFrame;
+                nextFrame = temp;
+            };
+        }, 5000); // Eksekusi penyegaran setiap 5 detik
+    </script>
 
 </body>
 </html>
