@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Google Sheets - No Blink Ultimate</title>
+    <title>Dashboard Google Sheets - Tanpa Iframe</title>
     
     <style>
         * {
@@ -16,69 +16,16 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background: #ffffff;
-            font-family: Arial, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
         }
         
         #dashboard-container {
-            position: relative;
             width: 100vw;
             height: 100vh;
-            background: #ffffff;
+            background: white;
             overflow: hidden;
-        }
-        
-        /* Layer utama yang selalu terlihat */
-        #display-layer {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 2;
-            background: #ffffff;
-            overflow: hidden;
-        }
-        
-        /* Layer background untuk preloading */
-        #preload-layer {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 1;
-            background: #ffffff;
-            overflow: hidden;
-            opacity: 0;
-            pointer-events: none;
-        }
-        
-        /* Iframe di dalam layer */
-        .layer-iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-            background: #ffffff;
-            display: block;
-        }
-        
-        /* Teknik snapshot: kita akan menggunakan canvas untuk screenshot */
-        #snapshot-canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 3;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.5s ease;
-            background: #ffffff;
-        }
-        
-        #snapshot-canvas.active {
-            opacity: 1;
+            position: relative;
         }
         
         /* Loading overlay */
@@ -89,11 +36,11 @@
             width: 100%;
             height: 100%;
             z-index: 9999;
-            background: #ffffff;
+            background: white;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
-            flex-direction: column;
             transition: opacity 0.8s ease;
         }
         
@@ -102,11 +49,11 @@
             pointer-events: none;
         }
         
-        .loader {
-            width: 60px;
-            height: 60px;
-            border: 6px solid #f3f3f3;
-            border-top: 6px solid #3498db;
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #1a73e8;
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -116,27 +63,114 @@
             100% { transform: rotate(360deg); }
         }
         
-        .loader-text {
+        .loading-text {
             margin-top: 20px;
             color: #666;
             font-size: 16px;
-            font-weight: 500;
         }
         
-        /* Status bar kecil (opsional) */
+        /* Container untuk konten */
+        #content-container {
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            padding: 20px;
+            background: white;
+        }
+        
+        /* Style tabel */
+        #data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            background: white;
+        }
+        
+        #data-table th {
+            background: #1a73e8;
+            color: white;
+            padding: 12px 15px;
+            text-align: left;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            font-weight: 600;
+        }
+        
+        #data-table td {
+            padding: 10px 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        #data-table tr:hover {
+            background: #f5f5f5;
+        }
+        
+        #data-table tr:nth-child(even) {
+            background: #fafafa;
+        }
+        
+        #data-table tr:nth-child(even):hover {
+            background: #f0f0f0;
+        }
+        
+        /* Status bar */
         #status-bar {
             position: fixed;
-            bottom: 10px;
-            right: 15px;
-            z-index: 10000;
-            background: rgba(0,0,0,0.7);
-            color: #fff;
-            padding: 6px 12px;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 8px 16px;
             border-radius: 20px;
-            font-size: 11px;
+            font-size: 12px;
+            z-index: 100;
             font-family: monospace;
             pointer-events: none;
-            opacity: 0.5;
+        }
+        
+        /* Error message */
+        #error-message {
+            display: none;
+            padding: 20px;
+            text-align: center;
+            color: #d32f2f;
+            font-size: 16px;
+            background: #ffebee;
+            border-radius: 8px;
+            margin: 20px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            #data-table {
+                font-size: 12px;
+            }
+            #data-table th, #data-table td {
+                padding: 8px 10px;
+            }
+            #content-container {
+                padding: 10px;
+            }
+        }
+        
+        /* Scrollbar styling */
+        #content-container::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        #content-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        
+        #content-container::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        
+        #content-container::-webkit-scrollbar-thumb:hover {
+            background: #555;
         }
     </style>
 </head>
@@ -144,8 +178,8 @@
 
     <!-- Loading Overlay -->
     <div id="loading-overlay">
-        <div class="loader"></div>
-        <div class="loader-text">Memuat Dashboard...</div>
+        <div class="spinner"></div>
+        <div class="loading-text">Memuat Data dari Google Sheets...</div>
     </div>
 
     <!-- Status Bar -->
@@ -153,275 +187,228 @@
 
     <!-- Dashboard Container -->
     <div id="dashboard-container">
-        <!-- Display Layer - Selalu terlihat -->
-        <div id="display-layer">
-            <iframe id="display-frame" class="layer-iframe" src="about:blank"></iframe>
+        <div id="content-container">
+            <div id="error-message"></div>
+            <table id="data-table">
+                <thead>
+                    <tr id="table-header">
+                        <!-- Header akan diisi oleh JavaScript -->
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    <!-- Data akan diisi oleh JavaScript -->
+                </tbody>
+            </table>
         </div>
-        
-        <!-- Preload Layer - Untuk memuat konten baru -->
-        <div id="preload-layer">
-            <iframe id="preload-frame" class="layer-iframe" src="about:blank"></iframe>
-        </div>
-        
-        <!-- Canvas untuk snapshot (screenshot) -->
-        <canvas id="snapshot-canvas"></canvas>
     </div>
 
     <script>
         (function() {
             'use strict';
             
-            const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQrR_4sYU9WDCp382UliBFElOjQ_lvMkvZQl9tkzRmrNmdYT3ZDSRPoXV3Qm8d12eZ46prmGhVFuym4/pubhtml?gid=1962305559&single=true";
+            // Konfigurasi=========================================================================================================================================================
+            const SHEET_ID = '1QrR_4sYU9WDCp382UliBFElOjQ_lvMkvZQl9tkzRmrNmdYT3ZDSRPoXV3Qm8d12eZ46prmGhVFuym4';
+            const SHEET_NAME = 'dashboard'; // Ganti dengan nama sheet Anda
+            const API_KEY = ''; // Kosongkan jika publik
+            
+            // Alternatif: Gunakan URL publik CSV
+            const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQrR_4sYU9WDCp382UliBFElOjQ_lvMkvZQl9tkzRmrNmdYT3ZDSRPoXV3Qm8d12eZ46prmGhVFuym4/pub?gid=1962305559&single=true&output=csv';
             
             // DOM Elements
-            const displayFrame = document.getElementById('display-frame');
-            const preloadFrame = document.getElementById('preload-frame');
-            const displayLayer = document.getElementById('display-layer');
-            const preloadLayer = document.getElementById('preload-layer');
-            const canvas = document.getElementById('snapshot-canvas');
-            const ctx = canvas.getContext('2d');
+            const tableHeader = document.getElementById('table-header');
+            const tableBody = document.getElementById('table-body');
             const statusBar = document.getElementById('status-bar');
             const loadingOverlay = document.getElementById('loading-overlay');
+            const errorMessage = document.getElementById('error-message');
             
-            // State
-            let isUpdating = false;
-            let isFirstLoad = true;
             let refreshInterval = null;
-            let snapshotActive = false;
+            let isUpdating = false;
+            let currentData = null;
             
-            // Resize canvas
-            function resizeCanvas() {
-                canvas.width = window.innerWidth;
-                canvas.height = window.innerHeight;
-            }
-            window.addEventListener('resize', resizeCanvas);
-            resizeCanvas();
-            
-            // Ambil screenshot dari iframe
-            function captureSnapshot(frame) {
+            // Fungsi untuk fetch data dari Google Sheets sebagai CSV
+            async function fetchSheetData() {
                 try {
-                    // Coba ambil screenshot menggunakan canvas
-                    // Catatan: Ini hanya bisa dilakukan jika iframe是同源
-                    // Untuk Google Sheets yang cross-origin, kita gunakan pendekatan lain
+                    const url = CSV_URL + '&t=' + new Date().getTime();
+                    console.log('Fetching data from:', url);
                     
-                    // Method alternatif: clone konten ke canvas
-                    // Tapi karena cross-origin, kita tidak bisa akses kontennya
-                    // Jadi kita gunakan teknik CSS opacity saja
+                    const response = await fetch(url, {
+                        cache: 'no-store',
+                        headers: {
+                            'Cache-Control': 'no-cache',
+                            'Pragma': 'no-cache'
+                        }
+                    });
                     
-                    // Kita hanya akan menggunakan opacity transition
-                    return false;
-                } catch(e) {
-                    return false;
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    const csvText = await response.text();
+                    return parseCSV(csvText);
+                    
+                } catch (error) {
+                    console.error('Error fetching data:', error);
+                    throw error;
                 }
             }
             
-            // Teknik swap dengan opacity
-            function performSwap() {
-                // Sembunyikan snapshot
-                canvas.classList.remove('active');
-                snapshotActive = false;
+            // Parse CSV ke array 2D
+            function parseCSV(csvText) {
+                const lines = csvText.split('\n').filter(line => line.trim() !== '');
+                if (lines.length === 0) return [];
                 
-                // Pindahkan preload layer ke display
-                // Kita pindahkan DOM element-nya
-                const preloadContent = preloadLayer.innerHTML;
-                const displayContent = displayLayer.innerHTML;
-                
-                // Swap konten
-                displayLayer.innerHTML = preloadContent;
-                preloadLayer.innerHTML = displayContent;
-                
-                // Re-assign frame references
-                const newDisplayFrame = displayLayer.querySelector('iframe');
-                const newPreloadFrame = preloadLayer.querySelector('iframe');
-                
-                // Update references
-                if (newDisplayFrame) {
-                    displayFrame.src = newDisplayFrame.src;
+                return lines.map(line => {
+                    // Handle CSV dengan kutip
+                    const values = [];
+                    let current = '';
+                    let inQuotes = false;
+                    
+                    for (let i = 0; i < line.length; i++) {
+                        const char = line[i];
+                        if (char === '"') {
+                            inQuotes = !inQuotes;
+                        } else if (char === ',' && !inQuotes) {
+                            values.push(current.trim());
+                            current = '';
+                        } else {
+                            current += char;
+                        }
+                    }
+                    values.push(current.trim());
+                    return values;
+                });
+            }
+            
+            // Render data ke tabel
+            function renderData(data) {
+                if (!data || data.length === 0) {
+                    showError('Tidak ada data yang ditemukan');
+                    return;
                 }
-                if (newPreloadFrame) {
-                    preloadFrame.src = newPreloadFrame.src;
+                
+                // Header
+                const headerRow = data[0];
+                tableHeader.innerHTML = headerRow.map(col => 
+                    `<th>${escapeHTML(col)}</th>`
+                ).join('');
+                
+                // Body
+                const bodyRows = data.slice(1);
+                if (bodyRows.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="100" style="text-align:center;padding:40px;color:#999;">Tidak ada data</td></tr>';
+                    return;
                 }
+                
+                tableBody.innerHTML = bodyRows.map(row => {
+                    // Pastikan setiap row memiliki jumlah kolom yang sama dengan header
+                    const rowData = [...row];
+                    while (rowData.length < headerRow.length) {
+                        rowData.push('');
+                    }
+                    return `<tr>${rowData.map(cell => `<td>${escapeHTML(cell)}</td>`).join('')}</tr>`;
+                }).join('');
                 
                 // Update status
-                isUpdating = false;
-                statusBar.textContent = '✅ Diperbarui: ' + new Date().toLocaleTimeString();
+                const rowCount = bodyRows.length;
+                const colCount = headerRow.length;
+                statusBar.textContent = `✅ ${rowCount} baris × ${colCount} kolom • ${new Date().toLocaleTimeString()}`;
                 
-                // Sembunyikan loading overlay jika first load
-                if (isFirstLoad) {
-                    isFirstLoad = false;
-                    setTimeout(() => {
-                        loadingOverlay.classList.add('hidden');
-                    }, 500);
-                }
+                // Sembunyikan loading
+                loadingOverlay.classList.add('hidden');
+                errorMessage.style.display = 'none';
             }
             
-            // Load konten baru di preload layer
-            function loadNextContent() {
+            // Escape HTML untuk keamanan
+            function escapeHTML(str) {
+                if (!str) return '';
+                const div = document.createElement('div');
+                div.textContent = str;
+                return div.innerHTML;
+            }
+            
+            // Tampilkan error
+            function showError(msg) {
+                errorMessage.textContent = '❌ ' + msg;
+                errorMessage.style.display = 'block';
+                loadingOverlay.classList.add('hidden');
+                statusBar.textContent = '❌ Error: ' + msg;
+            }
+            
+            // Refresh data
+            async function refreshData() {
                 if (isUpdating) {
-                    console.log('Update in progress, skipping...');
+                    console.log('Update already in progress, skipping...');
                     return;
                 }
                 
                 isUpdating = true;
                 statusBar.textContent = '⏳ Memuat ulang...';
                 
-                // Generate URL dengan timestamp
-                const url = SHEET_URL + '&t=' + new Date().getTime();
-                
-                // Set ke preload frame
-                preloadFrame.src = url;
-                
-                // Handler untuk load selesai
-                const loadHandler = function() {
-                    preloadFrame.removeEventListener('load', loadHandler);
-                    preloadFrame.removeEventListener('error', errorHandler);
-                    
-                    // Tunggu sebentar agar konten benar-benar tampil
-                    setTimeout(() => {
-                        // Aktifkan snapshot dulu (sebagai cover)
-                        takeSnapshot();
-                        
-                        // Lakukan swap
-                        setTimeout(() => {
-                            performSwap();
-                        }, 100);
-                    }, 500); // Tunggu 500ms agar konten stabil
-                };
-                
-                // Error handler
-                const errorHandler = function() {
-                    preloadFrame.removeEventListener('load', loadHandler);
-                    preloadFrame.removeEventListener('error', errorHandler);
-                    
-                    console.error('Failed to load content');
-                    isUpdating = false;
-                    statusBar.textContent = '❌ Gagal memuat';
-                    
-                    // Retry setelah 3 detik
-                    setTimeout(() => {
-                        if (!isUpdating) {
-                            loadNextContent();
-                        }
-                    }, 3000);
-                };
-                
-                preloadFrame.addEventListener('load', loadHandler);
-                preloadFrame.addEventListener('error', errorHandler);
-                
-                // Timeout safety
-                setTimeout(() => {
-                    if (isUpdating) {
-                        console.warn('Load timeout, forcing swap');
-                        preloadFrame.removeEventListener('load', loadHandler);
-                        preloadFrame.removeEventListener('error', errorHandler);
-                        
-                        // Force swap
-                        takeSnapshot();
-                        setTimeout(() => {
-                            performSwap();
-                        }, 100);
-                    }
-                }, 20000); // 20 detik timeout
-            }
-            
-            // Ambil snapshot dari display saat ini
-            function takeSnapshot() {
                 try {
-                    // Karena cross-origin, kita tidak bisa capture langsung
-                    // Gunakan CSS trick: clone display layer ke canvas
-                    // Tapi kita hanya bisa menampilkan layer yang sudah ada
+                    const data = await fetchSheetData();
+                    if (data && data.length > 0) {
+                        renderData(data);
+                        currentData = data;
+                    } else {
+                        throw new Error('Data kosong');
+                    }
+                } catch (error) {
+                    console.error('Refresh failed:', error);
+                    showError('Gagal memuat data: ' + error.message);
                     
-                    // Kita akan gunakan canvas sebagai overlay dengan opacity
-                    // Isi dengan warna putih dulu
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    
-                    // Coba capture display layer
-                    // Karena cross-origin, kita hanya bisa menampilkan layar saat ini
-                    // dengan cara men-snapshot seluruh viewport
-                    
-                    // Gunakan html2canvas atau sejenisnya? Tidak bisa di sini.
-                    // Kita akan gunakan pendekatan sederhana: 
-                    // tampilkan canvas dengan opacity rendah sebagai transisi
-                    
-                    canvas.classList.add('active');
-                    snapshotActive = true;
-                    
-                    // Hilangkan setelah 500ms
-                    setTimeout(() => {
-                        canvas.classList.remove('active');
-                        snapshotActive = false;
-                    }, 500);
-                    
-                } catch(e) {
-                    console.log('Snapshot not available');
+                    // Jika masih ada data lama, tetap tampilkan
+                    if (currentData) {
+                        // Tapi jangan render ulang, hanya tampilkan status error
+                        statusBar.textContent = '⚠️ Gagal refresh • ' + new Date().toLocaleTimeString();
+                    }
+                } finally {
+                    isUpdating = false;
                 }
             }
             
-            // Inisialisasi
-            function initialize() {
-                console.log('Initializing dashboard...');
-                
-                // Load pertama ke display frame
-                const url = SHEET_URL + '&t=' + new Date().getTime();
-                displayFrame.src = url;
-                
-                // Tunggu display frame selesai
-                displayFrame.addEventListener('load', function onFirstLoad() {
-                    displayFrame.removeEventListener('load', onFirstLoad);
-                    console.log('First load complete');
-                    
-                    // Sembunyikan loading overlay
-                    isFirstLoad = false;
-                    setTimeout(() => {
-                        loadingOverlay.classList.add('hidden');
-                    }, 500);
-                    
-                    statusBar.textContent = '✅ Siap: ' + new Date().toLocaleTimeString();
-                    
-                    // Preload konten berikutnya
-                    setTimeout(() => {
-                        preloadFrame.src = SHEET_URL + '&t=' + new Date().getTime();
-                    }, 2000);
-                    
-                    // Mulai interval refresh
-                    startRefreshInterval();
-                });
-                
-                // Error handling first load
-                displayFrame.addEventListener('error', function() {
-                    console.error('First load failed, retrying...');
-                    setTimeout(() => {
-                        displayFrame.src = SHEET_URL + '&t=' + new Date().getTime();
-                    }, 3000);
-                });
-                
-                // Timeout first load
-                setTimeout(() => {
-                    if (isFirstLoad) {
-                        console.warn('First load timeout, retrying...');
-                        displayFrame.src = SHEET_URL + '&t=' + new Date().getTime();
-                    }
-                }, 25000);
-            }
-            
-            // Start refresh interval
+            // Mulai interval refresh
             function startRefreshInterval() {
                 if (refreshInterval) {
                     clearInterval(refreshInterval);
                 }
                 
+                // Refresh setiap 30 detik (lebih aman untuk Google Sheets)
                 refreshInterval = setInterval(() => {
-                    if (!document.hidden && !isUpdating) {
-                        loadNextContent();
+                    if (!document.hidden) {
+                        refreshData();
                     }
-                }, 20000); // 20 detik
+                }, 30000); // 30 detik
                 
-                console.log('Refresh interval started: 20 seconds');
+                console.log('Refresh interval started: 30 seconds');
+            }
+            
+            // Inisialisasi
+            async function initialize() {
+                console.log('Initializing dashboard...');
+                
+                try {
+                    // Load data pertama
+                    const data = await fetchSheetData();
+                    if (data && data.length > 0) {
+                        renderData(data);
+                        currentData = data;
+                        startRefreshInterval();
+                    } else {
+                        throw new Error('Tidak ada data');
+                    }
+                } catch (error) {
+                    console.error('Initialization failed:', error);
+                    showError('Gagal memuat data: ' + error.message);
+                    
+                    // Coba lagi setelah 5 detik
+                    setTimeout(() => {
+                        initialize();
+                    }, 5000);
+                }
             }
             
             // Handle visibility change
-            document.addEventListener('visibilitychange', function() {
+            document.addEventListener('visibilitychange', () => {
                 if (document.hidden) {
                     if (refreshInterval) {
                         clearInterval(refreshInterval);
@@ -432,27 +419,21 @@
                     statusBar.textContent = '▶️ Resuming...';
                     if (!refreshInterval) {
                         startRefreshInterval();
-                        // Refresh jika sudah lama
-                        const now = Date.now();
-                        if (displayFrame.src && displayFrame.src.includes('&t=')) {
-                            const timestamp = parseInt(displayFrame.src.split('&t=')[1]);
-                            if (now - timestamp > 30000 && !isUpdating) {
-                                loadNextContent();
-                            }
-                        }
+                        // Refresh segera jika sudah lama
+                        refreshData();
                     }
                 }
             });
             
-            // Handle error global
-            window.addEventListener('error', function(e) {
+            // Handle error
+            window.addEventListener('error', (e) => {
                 console.error('Global error:', e.message);
             });
             
-            // Mulai
+            // Mulai aplikasi
             initialize();
             
-            console.log('Dashboard initialized with advanced anti-blink technique');
+            console.log('Dashboard initialized with Google Sheets API (CSV method)');
             
         })();
     </script>
